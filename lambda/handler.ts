@@ -222,7 +222,7 @@ Generate photorealistic result now.`;
 
     const firstPart = response.candidates?.[0]?.content?.parts?.[0];
     if (!firstPart || !("inlineData" in firstPart) || !firstPart.inlineData?.data) {
-      throw new Error("No image data found in Gemini response");
+      throw new Error("Failed to generate result. Please try again with different images.");
     }
 
     const generatedImageBase64 = firstPart.inlineData.data;
@@ -614,7 +614,7 @@ Generate photorealistic result now.`;
           "Gemini response did not contain image data. Full response:",
           JSON.stringify(response, null, 2)
         );
-        throw new Error("No image data found in Gemini response.");
+        throw new Error("Failed to generate result. Please try again with different images.");
       }
     }
 
