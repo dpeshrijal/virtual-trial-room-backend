@@ -203,65 +203,118 @@ REMEMBER: This is a complete wardrobe change. Old outfit is completely gone. New
 Generate photorealistic result now.`;
 
     console.log(`Processing job ${jobId} with Gemini API...`);
-    const result = await model.generateContent([
-      prompt,
-      userImagePart,
-      outfitImagePart,
-    ]);
-    const response = result.response;
 
-    // Update progress: 80%
-    await dynamoClient.send(
-      new UpdateItemCommand({
-        TableName: JOBS_TABLE,
-        Key: marshall({ jobId }),
-        UpdateExpression: "SET progress = :progress",
-        ExpressionAttributeValues: marshall({ ":progress": 80 }),
-      })
-    );
+    // Start simulated progress updates during AI processing
+    const progressInterval = setInterval(async () => {
+      try {
+        // Get current progress
+        const currentJob = await dynamoClient.send(
+          new GetItemCommand({
+            TableName: JOBS_TABLE,
+            Key: marshall({ jobId }),
+          })
+        );
 
-    const firstPart = response.candidates?.[0]?.content?.parts?.[0];
-    if (!firstPart || !("inlineData" in firstPart) || !firstPart.inlineData?.data) {
-      throw new Error("Failed to generate result. Please try again with different images.");
+        if (currentJob.Item) {
+          const job = unmarshall(currentJob.Item);
+          const currentProgress = job.progress || 40;
+
+          // Increment progress gradually from 40% to 75% (leave room for completion)
+          if (currentProgress < 75) {
+            const newProgress = Math.min(currentProgress + 5, 75);
+            await dynamoClient.send(
+              new UpdateItemCommand({
+                TableName: JOBS_TABLE,
+                Key: marshall({ jobId }),
+                UpdateExpression: "SET progress = :progress",
+                ExpressionAttributeValues: marshall({ ":progress": newProgress }),
+              })
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Error updating progress:", err);
+      }
+    }, 2000); // Update every 2 seconds
+
+    try {
+      const result = await model.generateContent([
+        prompt,
+        userImagePart,
+        outfitImagePart,
+      ]);
+      const response = result.response;
+
+      // Clear the interval once AI processing is done
+      clearInterval(progressInterval);
+
+      // Update progress: 85%
+      await dynamoClient.send(
+        new UpdateItemCommand({
+          TableName: JOBS_TABLE,
+          Key: marshall({ jobId }),
+          UpdateExpression: "SET progress = :progress",
+          ExpressionAttributeValues: marshall({ ":progress": 85 }),
+        })
+      );
+
+      const firstPart = response.candidates?.[0]?.content?.parts?.[0];
+      if (!firstPart || !("inlineData" in firstPart) || !firstPart.inlineData?.data) {
+        throw new Error("Failed to generate result. Please try again with different images.");
+      }
+
+      const generatedImageBase64 = firstPart.inlineData.data;
+      const imageBuffer = Buffer.from(generatedImageBase64, "base64");
+      const resultKey = `result-${randomUUID()}.jpeg`;
+
+      // Update progress: 90%
+      await dynamoClient.send(
+        new UpdateItemCommand({
+          TableName: JOBS_TABLE,
+          Key: marshall({ jobId }),
+          UpdateExpression: "SET progress = :progress",
+          ExpressionAttributeValues: marshall({ ":progress": 90 }),
+        })
+      );
+
+      // Upload result to S3
+      await s3Client.send(
+        new PutObjectCommand({
+          Bucket: RESULTS_BUCKET,
+          Key: resultKey,
+          Body: imageBuffer,
+          ContentType: "image/jpeg",
+        })
+      );
+
+      // Generate presigned URL
+      const resultSignedUrl = await getSignedUrl(
+        s3Client,
+        new GetObjectCommand({ Bucket: RESULTS_BUCKET, Key: resultKey }),
+        { expiresIn: 3600 }
+      );
+
+      // Update job as completed
+      await dynamoClient.send(
+        new UpdateItemCommand({
+          TableName: JOBS_TABLE,
+          Key: marshall({ jobId }),
+          UpdateExpression: "SET #status = :status, imageUrl = :imageUrl, progress = :progress",
+          ExpressionAttributeNames: { "#status": "status" },
+          ExpressionAttributeValues: marshall({
+            ":status": "completed",
+            ":imageUrl": resultSignedUrl,
+            ":progress": 100,
+          }),
+        })
+      );
+
+      console.log(`Job ${jobId} completed successfully`);
+    } catch (error: any) {
+      // Clear interval on error
+      clearInterval(progressInterval);
+      throw error; // Re-throw to be caught by outer error handler
     }
-
-    const generatedImageBase64 = firstPart.inlineData.data;
-    const imageBuffer = Buffer.from(generatedImageBase64, "base64");
-    const resultKey = `result-${randomUUID()}.jpeg`;
-
-    // Upload result to S3
-    await s3Client.send(
-      new PutObjectCommand({
-        Bucket: RESULTS_BUCKET,
-        Key: resultKey,
-        Body: imageBuffer,
-        ContentType: "image/jpeg",
-      })
-    );
-
-    // Generate presigned URL
-    const resultSignedUrl = await getSignedUrl(
-      s3Client,
-      new GetObjectCommand({ Bucket: RESULTS_BUCKET, Key: resultKey }),
-      { expiresIn: 3600 }
-    );
-
-    // Update job as completed
-    await dynamoClient.send(
-      new UpdateItemCommand({
-        TableName: JOBS_TABLE,
-        Key: marshall({ jobId }),
-        UpdateExpression: "SET #status = :status, imageUrl = :imageUrl, progress = :progress",
-        ExpressionAttributeNames: { "#status": "status" },
-        ExpressionAttributeValues: marshall({
-          ":status": "completed",
-          ":imageUrl": resultSignedUrl,
-          ":progress": 100,
-        }),
-      })
-    );
-
-    console.log(`Job ${jobId} completed successfully`);
   } catch (error: any) {
     console.error(`Error processing job ${jobId}:`, error);
     throw error; // Re-throw to be caught by the error handler in the main handler
