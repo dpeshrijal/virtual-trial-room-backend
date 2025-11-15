@@ -6,6 +6,7 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import { NodejsFunction } from "aws-cdk-lib/aws-lambda-nodejs";
 import * as path from "path";
 
@@ -47,6 +48,16 @@ export class VirtualTrialRoomBackendStack extends cdk.Stack {
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
 
+    // --- DynamoDB Table ---
+
+    // 3. DynamoDB table for job tracking
+    const jobsTable = new dynamodb.Table(this, "VirtualTryonJobsTable", {
+      partitionKey: { name: "jobId", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      timeToLiveAttribute: "ttl", // Auto-delete old jobs after 24 hours
+    });
+
     // --- IAM Permissions ---
 
     // 3. IAM Policy to allow reading the Gemini API key from Parameter Store
@@ -70,16 +81,26 @@ export class VirtualTrialRoomBackendStack extends cdk.Stack {
         UPLOADS_BUCKET_NAME: uploadsBucket.bucketName,
         RESULTS_BUCKET_NAME: resultsBucket.bucketName,
         GEMINI_API_KEY_PARAM_NAME: "/virtual-tryon/gemini-api-key",
+        JOBS_TABLE_NAME: jobsTable.tableName,
       },
-      timeout: cdk.Duration.seconds(30), // Increase timeout for AI processing
+      timeout: cdk.Duration.seconds(300), // 5 minutes for async processing
     });
 
     // 5. Attach the policy to the Lambda's execution role
     apiLambda.addToRolePolicy(geminiApiKeyPolicy);
 
-    // 6. Grant the Lambda permissions to read/write to our S3 buckets
+    // 6. Grant the Lambda permissions to read/write to our S3 buckets and DynamoDB table
     uploadsBucket.grantReadWrite(apiLambda); // Changed from grantRead to grantReadWrite for saveToS3 functionality
     resultsBucket.grantReadWrite(apiLambda);
+    jobsTable.grantReadWriteData(apiLambda);
+
+    // 6b. Grant Lambda permission to invoke functions (including itself) for async processing
+    apiLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["lambda:InvokeFunction"],
+        resources: [`arn:aws:lambda:${this.region}:${this.account}:function:*`],
+      })
+    );
 
     // --- API Gateway ---
 
