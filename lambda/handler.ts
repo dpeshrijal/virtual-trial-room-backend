@@ -92,6 +92,7 @@ async function processJobAsync(jobId: string): Promise<void> {
     const job = unmarshall(getResult.Item);
     const userImageKey = job.userImageKey;
     const outfitImageKey = job.outfitImageKey;
+    const garmentType = job.garmentType || "auto";
 
     // Update progress: 10%
     await dynamoClient.send(
@@ -152,55 +153,81 @@ async function processJobAsync(jobId: string): Promise<void> {
       })
     );
 
-    // Call Gemini API
-    const prompt = `Person image: [first image]
-New garment image: [second image]
+    // Build prompt based on garment type
+    let garmentTypeInstruction = "";
+    if (garmentType !== "auto") {
+      garmentTypeInstruction = `\nGARMENT TYPE: This is a ${garmentType}. ONLY replace the ${garmentType} - do NOT change any other clothing items.\n`;
+    }
 
-TASK OVERVIEW:
-Replace ALL of the person's current clothing with the new garment shown in the garment image. This is a complete clothing change, not an addition or layer.
+    const prompt = `🚨 CRITICAL: Output image MUST be EXACT same dimensions as input person photo. Do NOT change aspect ratio or canvas size under any circumstances.
 
-STEP 1 - UNDERSTAND CURRENT STATE:
-Analyze what clothing the person is currently wearing (shirt, jacket, blazer, t-shirt, dress, etc.)
-Note: This existing clothing will be COMPLETELY REMOVED and REPLACED
+Person photo: [first image]
+Garment to try on: [second image]
+${garmentTypeInstruction}
+CRITICAL TASK: Replace ONLY the specified garment while preserving EVERYTHING else exactly as-is.
 
-STEP 2 - UNDERSTAND NEW GARMENT:
-Analyze the new garment image
-Identify: garment type, color, pattern, how it's worn, all details
-Note: This will be the ONLY clothing visible in the final result
+⚠️ STRICT PRESERVATION RULES - DO NOT VIOLATE:
 
-STEP 3 - PERFORM COMPLETE REPLACEMENT:
-Remove ALL existing clothing from the person's body
-Replace with ONLY the new garment
-Do NOT keep any elements from the old outfit
-Do NOT layer the new garment over existing clothes
-Do NOT combine old and new clothing
-The new garment is the complete outfit - nothing else
+1. PRESERVE ORIGINAL IMAGE DIMENSIONS (MOST IMPORTANT):
+   - Output MUST be same width and height as person photo
+   - Do NOT expand, crop, or resize the canvas
+   - Do NOT add background areas
+   - Do NOT extend the image borders
+   - Keep exact same framing and composition
 
-STEP 4 - WEAR NEW GARMENT AS SHOWN:
-Wear the new garment EXACTLY as shown in the garment image
-If garment image shows it buttoned → wear it buttoned
-If garment image shows it open → wear it open
-If garment image shows it tucked → wear it tucked
-If garment image shows it loose → wear it loose
-Copy the exact wearing style from the garment image
-Do NOT copy the wearing style from the person's current outfit
-Ignore how the person's current clothes are worn
+2. PRESERVE PERSON'S FACE & BODY:
+   - Face MUST remain 100% identical - same skin tone, features, expression
+   - Do NOT apply any AI effects, smoothing, or beautification to face
+   - Do NOT change skin color, texture, or lighting on face
+   - Do NOT modify hair, eyes, nose, mouth, or any facial features
+   - Body proportions MUST stay exactly the same
+   - Do NOT change pose, posture, or body position
 
-CRITICAL RULES:
-❌ Do NOT keep the person's current clothing
-❌ Do NOT layer new garment over old clothes
-❌ Do NOT mimic styling from current outfit
-❌ Do NOT add pieces not shown in garment image
-❌ Do NOT interpret or modify the new garment
-✅ DO completely replace all clothing
-✅ DO show ONLY the new garment
-✅ DO wear it exactly as shown in garment image
-✅ DO preserve person's face, body, pose, background
-✅ DO make it photorealistic
+3. PRESERVE BACKGROUND:
+   - Background MUST remain pixel-perfect identical
+   - Do NOT blur, sharpen, or modify background in ANY way
+   - Do NOT add or remove background elements
+   - Do NOT change background colors or lighting
+   - Keep all background objects, walls, furniture exactly as-is
 
-REMEMBER: This is a complete wardrobe change. Old outfit is completely gone. New garment is all that's visible. Wear it as demonstrated in garment image, not as the old outfit was worn.
+4. PRESERVE OTHER CLOTHING ITEMS:
+   ${garmentType === "top" ? "- Do NOT change pants, skirts, shorts, or any bottom wear\n   - Do NOT change shoes, accessories, or jewelry" : ""}
+   ${garmentType === "bottom" ? "- Do NOT change shirts, tops, jackets, or any upper wear\n   - Do NOT change shoes, accessories, or jewelry" : ""}
+   ${garmentType === "dress" || garmentType === "full outfit" ? "- Do NOT change shoes or accessories unless shown in garment image" : ""}
+   - If person wears jewelry, glasses, watch, etc. → keep them EXACTLY as-is
+   - Do NOT remove or add clothing items not in the garment image
 
-Generate photorealistic result now.`;
+5. GARMENT REPLACEMENT RULES:
+   - Identify what type of garment is shown in the second image
+   - Replace ONLY that specific type of clothing on the person
+   - Wear the garment EXACTLY as shown in the garment image:
+     * Same wearing style (buttoned/unbuttoned, tucked/untucked, etc.)
+     * Same fit and draping
+     * Same color and pattern
+   - Do NOT interpret, modify, or "improve" the garment
+   - Do NOT change the style or fit from what's shown
+
+6. LIGHTING & QUALITY:
+   - Match lighting of original person photo
+   - Keep same photo quality and grain
+   - Do NOT over-smooth or make image look overly AI-generated
+   - Maintain realistic, natural photographic quality
+
+❌ ABSOLUTELY FORBIDDEN:
+- Expanding image canvas or adding background
+- Changing facial features or applying beauty filters
+- Modifying background in any way
+- Changing clothing items other than the specified garment
+- Altering image dimensions
+- Adding AI-generated artifacts
+- Making the output image square or any different aspect ratio than the input
+
+✅ YOUR ONLY JOB:
+Replace the specified garment with the one shown in the second image. Everything else stays 100% identical.
+
+🔒 FINAL REMINDER: The output image dimensions and aspect ratio MUST exactly match the input person photo. Do not change the canvas size, do not add background areas, do not crop. Use the EXACT same width, height, and aspect ratio as the person photo.
+
+Generate result now - preserve everything except the garment.`;
 
     console.log(`Processing job ${jobId} with Gemini API...`);
 
@@ -463,6 +490,7 @@ export const handler = async (
               outfitImageKey: outfitKey,
               userImageMimeType: body.userImageMimeType || "image/jpeg",
               outfitImageMimeType: body.outfitImageMimeType || "image/jpeg",
+              garmentType: body.garmentType || "auto",
             }),
           })
         );
