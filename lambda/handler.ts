@@ -153,100 +153,102 @@ async function processJobAsync(jobId: string): Promise<void> {
       })
     );
 
-    // Build prompt based on garment type
-    let garmentTypeInstruction = "";
-    if (garmentType !== "auto") {
-      garmentTypeInstruction = `\nGARMENT TYPE: This is a ${garmentType}. ONLY replace the ${garmentType} - do NOT change any other clothing items.\n`;
-    }
+    // Build garment-specific instruction
+    const garmentInstruction = garmentType === "top"
+      ? "ONLY the upper body garment (shirt/top/jacket). Do NOT touch pants, shoes, or accessories."
+      : garmentType === "bottom"
+      ? "ONLY the lower body garment (pants/skirt/shorts). Do NOT touch shirt, shoes, or accessories."
+      : "the full outfit (top + bottom or dress). Do NOT touch shoes or accessories unless shown in garment image.";
 
-    const prompt = `🚨 CRITICAL: Output image MUST be EXACT same dimensions as input person photo. Do NOT change aspect ratio or canvas size under any circumstances.
+    const prompt = `🎯 TASK: VIRTUAL TRY-ON - Edit Photo to Change ${garmentType.toUpperCase()}
 
-Person photo: [first image]
-Garment to try on: [second image]
-${garmentTypeInstruction}
+IMAGE 1 (Person to edit): The person whose outfit you will change
+IMAGE 2 (New garment): The ${garmentType} to put on the person from Image 1
 
-🎯 YOUR TASK - COMPLETE GARMENT REPLACEMENT:
-STEP 1: IDENTIFY the type of garment in the second image (shirt, t-shirt, jacket, dress, pants, etc.)
-STEP 2: COMPLETELY REMOVE the corresponding clothing item from the person in the first image
-STEP 3: REPLACE it with the new garment from the second image
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-⚠️ CRITICAL UNDERSTANDING - THIS IS NOT LAYERING:
-❌ DO NOT place the new garment ON TOP of existing clothing
-❌ DO NOT keep any part of the old clothing visible underneath
-✅ COMPLETELY REMOVE the old garment and REPLACE with the new one
-✅ The new garment should be worn directly on the person's body (or over undergarments if appropriate)
+🔴 CRITICAL RULE #1: PRESERVE THE PERSON'S IDENTITY
+- The person in the OUTPUT must be the EXACT SAME person as IMAGE 1
+- Same face, same body, same skin tone, same pose, same expression
+- DO NOT generate a different person
+- DO NOT create a new person wearing the garment
+- This is PHOTO EDITING, not person generation
 
-EXAMPLE - If replacing a t-shirt:
-❌ WRONG: Person wearing original shirt + new t-shirt layered on top
-✅ CORRECT: Original shirt GONE, person wearing ONLY the new t-shirt
+🔴 CRITICAL RULE #2: EDIT THE GARMENT ONLY
+- Remove ${garmentInstruction}
+- Replace it with the ${garmentType} from IMAGE 2
+- Everything else stays IDENTICAL to IMAGE 1
 
-⚠️ STRICT PRESERVATION RULES - DO NOT VIOLATE:
+🔴 CRITICAL RULE #3: PRESERVE EXACT DIMENSIONS
+- Output size MUST match IMAGE 1 exactly (same width × height)
+- Do NOT crop, expand, or change aspect ratio
+- Do NOT add background space
 
-1. PRESERVE ORIGINAL IMAGE DIMENSIONS (MOST IMPORTANT):
-   - Output MUST be same width and height as person photo
-   - Do NOT expand, crop, or resize the canvas
-   - Do NOT add background areas
-   - Do NOT extend the image borders
-   - Keep exact same framing and composition
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-2. PRESERVE PERSON'S FACE & BODY:
-   - Face MUST remain 100% identical - same skin tone, features, expression
-   - Do NOT apply any AI effects, smoothing, or beautification to face
-   - Do NOT change skin color, texture, or lighting on face
-   - Do NOT modify hair, eyes, nose, mouth, or any facial features
-   - Body proportions MUST stay exactly the same
-   - Do NOT change pose, posture, or body position
-   - Skin/arms/neck visible in original MUST stay exactly the same
+✅ STEP-BY-STEP PROCESS:
 
-3. PRESERVE BACKGROUND:
-   - Background MUST remain pixel-perfect identical
-   - Do NOT blur, sharpen, or modify background in ANY way
-   - Do NOT add or remove background elements
-   - Do NOT change background colors or lighting
-   - Keep all background objects, walls, furniture exactly as-is
+STEP 1 - ANALYZE:
+• Look at the person in IMAGE 1 - this is who must appear in the output
+• Identify their current ${garmentType} that needs to be removed
+• Look at IMAGE 2 to see the new ${garmentType} design
 
-4. PRESERVE OTHER CLOTHING ITEMS:
-   ${garmentType === "top" ? "- Do NOT change pants, skirts, shorts, or any bottom wear\n   - Do NOT change shoes, accessories, or jewelry" : ""}
-   ${garmentType === "bottom" ? "- Do NOT change shirts, tops, jackets, or any upper wear\n   - Do NOT change shoes, accessories, or jewelry" : ""}
-   ${garmentType === "dress" || garmentType === "full outfit" ? "- Do NOT change shoes or accessories unless shown in garment image" : ""}
-   - If person wears jewelry, glasses, watch, etc. → keep them EXACTLY as-is
-   - Do NOT remove or add clothing items not in the garment image
+STEP 2 - EDIT THE GARMENT:
+• Digitally remove the old ${garmentType} from the person in IMAGE 1
+• Replace it with the ${garmentType} from IMAGE 2
+• The new ${garmentType} should fit the person's body naturally
+• Match the style, color, and wearing manner from IMAGE 2
 
-5. COMPLETE REPLACEMENT RULES (MOST CRITICAL):
-   - STEP 1: Remove the old garment ENTIRELY - it should NOT be visible at all
-   - STEP 2: Place the new garment directly on the person's body
-   - STEP 3: Ensure NO layering - the new garment replaces, not covers
-   - The new garment should fit the person's body exactly as shown in garment image
-   - Match the wearing style from garment image (buttoned/unbuttoned, tucked/untucked, etc.)
-   - Keep same color, pattern, and style as shown in garment image
-   - Do NOT show any trace of the original clothing underneath
+STEP 3 - PRESERVE EVERYTHING ELSE:
+• Person's face: EXACT same (identity, expression, skin tone, features)
+• Person's body: EXACT same (pose, proportions, visible skin)
+• Background: EXACT same (walls, floor, objects, lighting)
+• Other clothing: EXACT same (${garmentType === "top" ? "pants, shoes, accessories" : garmentType === "bottom" ? "shirt, shoes, accessories" : "shoes, accessories if not in garment image"})
+• Photo dimensions: EXACT same (width, height, framing)
 
-6. LIGHTING & QUALITY:
-   - Match lighting of original person photo
-   - Keep same photo quality and grain
-   - Do NOT over-smooth or make image look overly AI-generated
-   - Maintain realistic, natural photographic quality
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-❌ ABSOLUTELY FORBIDDEN:
-- Layering new garment over old clothing (CRITICAL ERROR)
-- Keeping any part of old garment visible
-- Expanding image canvas or adding background
-- Changing facial features or applying beauty filters
-- Modifying background in any way
-- Changing clothing items other than the specified garment
-- Altering image dimensions
-- Adding AI-generated artifacts
-- Making the output image square or any different aspect ratio than the input
+❌ COMMON MISTAKES TO AVOID:
 
-✅ YOUR ONLY JOB:
-COMPLETELY REMOVE the target garment from the person and REPLACE it with the new garment. The old clothing MUST be gone - not hidden underneath, but REMOVED. Everything else (face, body, pose, background, other clothes) stays 100% identical.
+1. ❌ Creating a NEW person wearing the garment
+   ✅ Edit the EXISTING person from IMAGE 1
 
-🔒 FINAL REMINDER:
-1. The output image dimensions and aspect ratio MUST exactly match the input person photo
-2. The old garment MUST be COMPLETELY REMOVED before adding the new one
-3. NO layering - this is a REPLACEMENT, not an overlay
+2. ❌ Layering the new garment over old clothes
+   ✅ Remove old ${garmentType}, then add new one
 
-Generate result now - complete replacement, preserve everything else.`;
+3. ❌ Changing the person's face or identity
+   ✅ Keep the EXACT same person
+
+4. ❌ Generating a different background or pose
+   ✅ Keep background and pose identical
+
+5. ❌ Changing image dimensions or adding space
+   ✅ Match IMAGE 1 dimensions exactly
+
+6. ❌ Modifying body parts, skin tone, or features
+   ✅ Preserve all physical characteristics
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 VALIDATION CHECKLIST (Verify before generating):
+
+□ Same person as IMAGE 1? (face, identity, features)
+□ Same pose and body as IMAGE 1?
+□ Same background as IMAGE 1?
+□ Same image dimensions as IMAGE 1?
+□ Only the ${garmentType} changed?
+□ New ${garmentType} matches IMAGE 2 design?
+□ Everything else preserved from IMAGE 1?
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎬 FINAL INSTRUCTION:
+
+Take IMAGE 1 (the person), edit ONLY their ${garmentType} to match IMAGE 2, preserve EVERYTHING else including their identity, pose, background, and image size.
+
+This is photo editing, NOT creating a new image with a new person.
+
+Generate the edited photo now.`;
 
     console.log(`Processing job ${jobId} with Gemini API...`);
 
