@@ -153,12 +153,50 @@ async function processJobAsync(jobId: string): Promise<void> {
       })
     );
 
-    // Build garment-specific instruction
+    // Build garment-specific instruction with detailed removal and replacement guidance
     const garmentInstruction = garmentType === "top"
       ? "ONLY the upper body garment (shirt/top/jacket). Do NOT touch pants, shoes, or accessories."
       : garmentType === "bottom"
       ? "ONLY the lower body garment (pants/skirt/shorts). Do NOT touch shirt, shoes, or accessories."
       : "the full outfit (top + bottom or dress). Do NOT touch shoes or accessories unless shown in garment image.";
+
+    const removalGuidance = garmentType === "top"
+      ? `Remove EVERYTHING covering the torso and arms:
+- Remove the ENTIRE shirt/top/jacket/blazer/sweater completely
+- Remove ALL collars, ties, scarves, and neckwear
+- Remove ALL buttons, zippers, and garment details from the old outfit
+- Expose the person's skin/body underneath (neck, chest area visible in new garment, arms if new garment is sleeveless)
+- The removal area includes: neck area, shoulders, chest, torso, and arms down to where the new garment ends
+- If the new garment from IMAGE 2 shows the neck (like a t-shirt or jersey), the neck area MUST be visible - remove any collar or tie
+- If the new garment has short sleeves, arms below the sleeve MUST show skin, not old garment fabric`
+      : garmentType === "bottom"
+      ? `Remove EVERYTHING covering the legs:
+- Remove the ENTIRE pants/skirt/shorts completely
+- Remove ALL belts, waistbands, and garment details from the old outfit
+- Expose the person's skin/body underneath (legs if new garment is shorter)
+- The removal area includes: waist, hips, thighs, legs down to where the new garment ends
+- If the new garment is shorts and old garment was pants, legs below shorts MUST show skin, not old pants fabric`
+      : `Remove EVERYTHING covering the body:
+- Remove the ENTIRE dress/outfit completely
+- Remove ALL accessories that are part of the old garment
+- Expose the person's skin/body underneath where the new garment doesn't cover`;
+
+    const fittingGuidance = garmentType === "top"
+      ? `The new ${garmentType} from IMAGE 2 should:
+- Cover ONLY the areas that the garment in IMAGE 2 covers
+- If IMAGE 2 shows a crew neck t-shirt, the NECK must be visible (no collar or tie from old outfit)
+- If IMAGE 2 shows short sleeves, ARMS below the sleeves must show skin (no fabric from old outfit)
+- If IMAGE 2 shows a sleeveless top, ENTIRE ARMS must show skin
+- Match the exact neckline style from IMAGE 2 (v-neck, crew neck, collar, etc.)
+- Match the exact sleeve length from IMAGE 2 (sleeveless, short, 3/4, long)
+- The garment should fit naturally on the person's body as shown in IMAGE 2`
+      : garmentType === "bottom"
+      ? `The new ${garmentType} from IMAGE 2 should:
+- Cover ONLY the areas that the garment in IMAGE 2 covers
+- If IMAGE 2 shows shorts and old photo had pants, LEGS below shorts must show skin (no pants fabric)
+- Match the exact length from IMAGE 2 (shorts, knee-length, ankle-length, etc.)
+- The garment should fit naturally on the person's body as shown in IMAGE 2`
+      : `The new outfit from IMAGE 2 should cover exactly what it covers in IMAGE 2, with skin visible in exposed areas`;
 
     const prompt = `🎯 TASK: VIRTUAL TRY-ON - Edit Photo to Change ${garmentType.toUpperCase()}
 
@@ -181,10 +219,11 @@ IMAGE 2 (New garment): The ${garmentType} to put on the person from Image 1
 - If no visible change occurs, the task has FAILED
 - DO NOT return IMAGE 1 unchanged - a change MUST be visible
 
-🔴 CRITICAL RULE #3: EDIT THE GARMENT ONLY
-- Remove ${garmentInstruction}
-- Replace it with the ${garmentType} from IMAGE 2
-- Everything else stays IDENTICAL to IMAGE 1
+🔴 CRITICAL RULE #3: COMPLETE REMOVAL AND REPLACEMENT
+${removalGuidance}
+
+Then add the new ${garmentType}:
+${fittingGuidance}
 
 🔴 CRITICAL RULE #4: PRESERVE EXACT DIMENSIONS
 - Output size MUST match IMAGE 1 exactly (same width × height)
@@ -197,22 +236,31 @@ IMAGE 2 (New garment): The ${garmentType} to put on the person from Image 1
 
 STEP 1 - ANALYZE:
 • Look at the person in IMAGE 1 - this is who must appear in the output
-• Identify their current ${garmentType} - note its color, style, and design
-• Look at IMAGE 2 to see the new ${garmentType} design - note how it DIFFERS from IMAGE 1
+• Identify their current ${garmentType} - note its color, style, design, neckline, and sleeve length
+• Look at IMAGE 2 to see the new ${garmentType} design - note the neckline type, sleeve length, and coverage area
+• Note what parts of the body will be exposed (neck, arms, legs) based on IMAGE 2's garment style
 • The difference between IMAGE 1's ${garmentType} and IMAGE 2's ${garmentType} MUST be visible in output
 
-STEP 2 - EDIT THE GARMENT:
-• Digitally remove the old ${garmentType} from the person in IMAGE 1
-• Replace it with the ${garmentType} from IMAGE 2
-• The new ${garmentType} should fit the person's body naturally
-• Match the EXACT style, color, pattern, and wearing manner from IMAGE 2
+STEP 2 - COMPLETELY REMOVE THE OLD GARMENT:
+• Remove the ENTIRE old ${garmentType} from IMAGE 1 - every piece of it
+• Remove ALL accessories attached to the old garment (collars, ties, buttons, zippers)
+• Expose the person's natural skin/body in areas that will be visible in the new garment
+• Example: If changing from suit+tie to t-shirt, remove the suit jacket, dress shirt, AND the tie completely - show the neck
+• Example: If changing from long sleeve to short sleeve, remove the entire long sleeve - show the arms below the new sleeve line
+• DO NOT leave any remnants of the old garment visible
+
+STEP 3 - ADD THE NEW GARMENT:
+• Place the new ${garmentType} from IMAGE 2 onto the person
+• The new ${garmentType} should cover ONLY what it covers in IMAGE 2
+• Match the EXACT style, color, pattern, neckline, and sleeve length from IMAGE 2
+• Areas not covered by the new garment MUST show skin, not old garment fabric
 • Ensure the change is CLEARLY VISIBLE
 
-STEP 3 - PRESERVE EVERYTHING ELSE:
+STEP 4 - PRESERVE EVERYTHING ELSE:
 • Person's face: EXACT same (identity, expression, skin tone, features)
 • Person's body: EXACT same (pose, proportions, visible skin)
 • Background: EXACT same (walls, floor, objects, lighting)
-• Other clothing: EXACT same (${garmentType === "top" ? "pants, shoes, accessories" : garmentType === "bottom" ? "shirt, shoes, accessories" : "shoes, accessories if not in garment image"})
+• Other clothing: EXACT same (${garmentType === "top" ? "pants, shoes, accessories NOT part of the old top" : garmentType === "bottom" ? "shirt, shoes, accessories NOT part of the old bottom" : "shoes, accessories NOT part of the old outfit"})
 • Photo dimensions: EXACT same (width, height, framing)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -225,22 +273,25 @@ STEP 3 - PRESERVE EVERYTHING ELSE:
 2. ❌ Creating a NEW person wearing the garment
    ✅ Edit the EXISTING person from IMAGE 1
 
-3. ❌ Layering the new garment over old clothes
-   ✅ Remove old ${garmentType}, then add new one
+3. ❌ Leaving parts of the old garment visible (collar, tie, sleeve fabric, etc.)
+   ✅ Remove the ENTIRE old garment - show skin in exposed areas
 
-4. ❌ Changing the person's face or identity
+4. ❌ Covering exposed skin areas with old garment fabric
+   ✅ If IMAGE 2 shows neck/arms/legs, those areas MUST show skin in the output
+
+5. ❌ Changing the person's face or identity
    ✅ Keep the EXACT same person
 
-5. ❌ Generating a different background or pose
+6. ❌ Generating a different background or pose
    ✅ Keep background and pose identical
 
-6. ❌ Changing image dimensions or adding space
+7. ❌ Changing image dimensions or adding space
    ✅ Match IMAGE 1 dimensions exactly
 
-7. ❌ Modifying body parts, skin tone, or features
+8. ❌ Modifying body parts, skin tone, or features
    ✅ Preserve all physical characteristics
 
-8. ❌ Keeping the same garment color/style as IMAGE 1
+9. ❌ Keeping the same garment color/style as IMAGE 1
    ✅ Change to IMAGE 2's garment color/style
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -251,8 +302,11 @@ STEP 3 - PRESERVE EVERYTHING ELSE:
 □ Same pose and body as IMAGE 1?
 □ Same background as IMAGE 1?
 □ Same image dimensions as IMAGE 1?
+□ Old ${garmentType} COMPLETELY REMOVED (including collars, ties, accessories)?
+□ Exposed skin areas visible (neck, arms, legs) based on new garment coverage?
 □ ${garmentType} VISIBLY CHANGED from IMAGE 1?
-□ New ${garmentType} matches IMAGE 2 design (color, style, pattern)?
+□ New ${garmentType} matches IMAGE 2 design (color, style, pattern, neckline, sleeve length)?
+□ No remnants of old garment fabric in exposed areas?
 □ Everything else preserved from IMAGE 1?
 □ If you can't see a clear difference in the ${garmentType}, DO NOT proceed
 
@@ -260,13 +314,17 @@ STEP 3 - PRESERVE EVERYTHING ELSE:
 
 🎬 FINAL INSTRUCTION:
 
-Take IMAGE 1 (the person), CHANGE their ${garmentType} to match IMAGE 2's ${garmentType}, preserve EVERYTHING else including their identity, pose, background, and image size.
+Take IMAGE 1 (the person), COMPLETELY REMOVE their old ${garmentType} (including ALL parts like collars, ties, sleeves), then ADD the new ${garmentType} from IMAGE 2, preserve EVERYTHING else including their identity, pose, background, and image size.
 
-CRITICAL: The ${garmentType} in the output MUST look different from IMAGE 1. If it looks the same, you have failed the task.
+CRITICAL REQUIREMENTS:
+1. The ${garmentType} in the output MUST look different from IMAGE 1 - if it looks the same, you have FAILED
+2. NO parts of the old garment should remain visible (no collar from old shirt under new jersey, no sleeve fabric below new short sleeves)
+3. Exposed skin areas (neck, arms, legs) MUST show actual skin, not old garment fabric
+4. The new garment should cover ONLY what it covers in IMAGE 2 - if IMAGE 2 shows the neck, the output MUST show the neck
 
-This is photo editing with a MANDATORY visible garment change, NOT creating a new image with a new person.
+This is photo editing with COMPLETE garment replacement and MANDATORY visible change, NOT creating a new image with a new person.
 
-Generate the edited photo now with the garment clearly changed.`;
+Generate the edited photo now with the old garment completely gone and the new garment clearly visible.`;
 
     console.log(`Processing job ${jobId} with Gemini API...`);
 
