@@ -174,12 +174,19 @@ IMAGE 2 (New garment): The ${garmentType} to put on the person from Image 1
 - DO NOT create a new person wearing the garment
 - This is PHOTO EDITING, not person generation
 
-🔴 CRITICAL RULE #2: EDIT THE GARMENT ONLY
+🔴 CRITICAL RULE #2: THE GARMENT MUST VISIBLY CHANGE
+- The ${garmentType} in the OUTPUT must look DIFFERENT from IMAGE 1
+- The new ${garmentType} MUST match the style, color, and design from IMAGE 2
+- If IMAGE 1 shows a white shirt, and IMAGE 2 shows a black shirt, OUTPUT must show black shirt
+- If no visible change occurs, the task has FAILED
+- DO NOT return IMAGE 1 unchanged - a change MUST be visible
+
+🔴 CRITICAL RULE #3: EDIT THE GARMENT ONLY
 - Remove ${garmentInstruction}
 - Replace it with the ${garmentType} from IMAGE 2
 - Everything else stays IDENTICAL to IMAGE 1
 
-🔴 CRITICAL RULE #3: PRESERVE EXACT DIMENSIONS
+🔴 CRITICAL RULE #4: PRESERVE EXACT DIMENSIONS
 - Output size MUST match IMAGE 1 exactly (same width × height)
 - Do NOT crop, expand, or change aspect ratio
 - Do NOT add background space
@@ -190,14 +197,16 @@ IMAGE 2 (New garment): The ${garmentType} to put on the person from Image 1
 
 STEP 1 - ANALYZE:
 • Look at the person in IMAGE 1 - this is who must appear in the output
-• Identify their current ${garmentType} that needs to be removed
-• Look at IMAGE 2 to see the new ${garmentType} design
+• Identify their current ${garmentType} - note its color, style, and design
+• Look at IMAGE 2 to see the new ${garmentType} design - note how it DIFFERS from IMAGE 1
+• The difference between IMAGE 1's ${garmentType} and IMAGE 2's ${garmentType} MUST be visible in output
 
 STEP 2 - EDIT THE GARMENT:
 • Digitally remove the old ${garmentType} from the person in IMAGE 1
 • Replace it with the ${garmentType} from IMAGE 2
 • The new ${garmentType} should fit the person's body naturally
-• Match the style, color, and wearing manner from IMAGE 2
+• Match the EXACT style, color, pattern, and wearing manner from IMAGE 2
+• Ensure the change is CLEARLY VISIBLE
 
 STEP 3 - PRESERVE EVERYTHING ELSE:
 • Person's face: EXACT same (identity, expression, skin tone, features)
@@ -210,23 +219,29 @@ STEP 3 - PRESERVE EVERYTHING ELSE:
 
 ❌ COMMON MISTAKES TO AVOID:
 
-1. ❌ Creating a NEW person wearing the garment
+1. ❌ Returning IMAGE 1 unchanged (NO VISIBLE GARMENT CHANGE)
+   ✅ The ${garmentType} MUST visibly change to match IMAGE 2
+
+2. ❌ Creating a NEW person wearing the garment
    ✅ Edit the EXISTING person from IMAGE 1
 
-2. ❌ Layering the new garment over old clothes
+3. ❌ Layering the new garment over old clothes
    ✅ Remove old ${garmentType}, then add new one
 
-3. ❌ Changing the person's face or identity
+4. ❌ Changing the person's face or identity
    ✅ Keep the EXACT same person
 
-4. ❌ Generating a different background or pose
+5. ❌ Generating a different background or pose
    ✅ Keep background and pose identical
 
-5. ❌ Changing image dimensions or adding space
+6. ❌ Changing image dimensions or adding space
    ✅ Match IMAGE 1 dimensions exactly
 
-6. ❌ Modifying body parts, skin tone, or features
+7. ❌ Modifying body parts, skin tone, or features
    ✅ Preserve all physical characteristics
+
+8. ❌ Keeping the same garment color/style as IMAGE 1
+   ✅ Change to IMAGE 2's garment color/style
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -236,19 +251,22 @@ STEP 3 - PRESERVE EVERYTHING ELSE:
 □ Same pose and body as IMAGE 1?
 □ Same background as IMAGE 1?
 □ Same image dimensions as IMAGE 1?
-□ Only the ${garmentType} changed?
-□ New ${garmentType} matches IMAGE 2 design?
+□ ${garmentType} VISIBLY CHANGED from IMAGE 1?
+□ New ${garmentType} matches IMAGE 2 design (color, style, pattern)?
 □ Everything else preserved from IMAGE 1?
+□ If you can't see a clear difference in the ${garmentType}, DO NOT proceed
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🎬 FINAL INSTRUCTION:
 
-Take IMAGE 1 (the person), edit ONLY their ${garmentType} to match IMAGE 2, preserve EVERYTHING else including their identity, pose, background, and image size.
+Take IMAGE 1 (the person), CHANGE their ${garmentType} to match IMAGE 2's ${garmentType}, preserve EVERYTHING else including their identity, pose, background, and image size.
 
-This is photo editing, NOT creating a new image with a new person.
+CRITICAL: The ${garmentType} in the output MUST look different from IMAGE 1. If it looks the same, you have failed the task.
 
-Generate the edited photo now.`;
+This is photo editing with a MANDATORY visible garment change, NOT creating a new image with a new person.
+
+Generate the edited photo now with the garment clearly changed.`;
 
     console.log(`Processing job ${jobId} with Gemini API...`);
 
