@@ -164,7 +164,21 @@ async function processJobAsync(jobId: string): Promise<void> {
 Person photo: [first image]
 Garment to try on: [second image]
 ${garmentTypeInstruction}
-CRITICAL TASK: Replace ONLY the specified garment while preserving EVERYTHING else exactly as-is.
+
+🎯 YOUR TASK - COMPLETE GARMENT REPLACEMENT:
+STEP 1: IDENTIFY the type of garment in the second image (shirt, t-shirt, jacket, dress, pants, etc.)
+STEP 2: COMPLETELY REMOVE the corresponding clothing item from the person in the first image
+STEP 3: REPLACE it with the new garment from the second image
+
+⚠️ CRITICAL UNDERSTANDING - THIS IS NOT LAYERING:
+❌ DO NOT place the new garment ON TOP of existing clothing
+❌ DO NOT keep any part of the old clothing visible underneath
+✅ COMPLETELY REMOVE the old garment and REPLACE with the new one
+✅ The new garment should be worn directly on the person's body (or over undergarments if appropriate)
+
+EXAMPLE - If replacing a t-shirt:
+❌ WRONG: Person wearing original shirt + new t-shirt layered on top
+✅ CORRECT: Original shirt GONE, person wearing ONLY the new t-shirt
 
 ⚠️ STRICT PRESERVATION RULES - DO NOT VIOLATE:
 
@@ -182,6 +196,7 @@ CRITICAL TASK: Replace ONLY the specified garment while preserving EVERYTHING el
    - Do NOT modify hair, eyes, nose, mouth, or any facial features
    - Body proportions MUST stay exactly the same
    - Do NOT change pose, posture, or body position
+   - Skin/arms/neck visible in original MUST stay exactly the same
 
 3. PRESERVE BACKGROUND:
    - Background MUST remain pixel-perfect identical
@@ -197,15 +212,14 @@ CRITICAL TASK: Replace ONLY the specified garment while preserving EVERYTHING el
    - If person wears jewelry, glasses, watch, etc. → keep them EXACTLY as-is
    - Do NOT remove or add clothing items not in the garment image
 
-5. GARMENT REPLACEMENT RULES:
-   - Identify what type of garment is shown in the second image
-   - Replace ONLY that specific type of clothing on the person
-   - Wear the garment EXACTLY as shown in the garment image:
-     * Same wearing style (buttoned/unbuttoned, tucked/untucked, etc.)
-     * Same fit and draping
-     * Same color and pattern
-   - Do NOT interpret, modify, or "improve" the garment
-   - Do NOT change the style or fit from what's shown
+5. COMPLETE REPLACEMENT RULES (MOST CRITICAL):
+   - STEP 1: Remove the old garment ENTIRELY - it should NOT be visible at all
+   - STEP 2: Place the new garment directly on the person's body
+   - STEP 3: Ensure NO layering - the new garment replaces, not covers
+   - The new garment should fit the person's body exactly as shown in garment image
+   - Match the wearing style from garment image (buttoned/unbuttoned, tucked/untucked, etc.)
+   - Keep same color, pattern, and style as shown in garment image
+   - Do NOT show any trace of the original clothing underneath
 
 6. LIGHTING & QUALITY:
    - Match lighting of original person photo
@@ -214,6 +228,8 @@ CRITICAL TASK: Replace ONLY the specified garment while preserving EVERYTHING el
    - Maintain realistic, natural photographic quality
 
 ❌ ABSOLUTELY FORBIDDEN:
+- Layering new garment over old clothing (CRITICAL ERROR)
+- Keeping any part of old garment visible
 - Expanding image canvas or adding background
 - Changing facial features or applying beauty filters
 - Modifying background in any way
@@ -223,11 +239,14 @@ CRITICAL TASK: Replace ONLY the specified garment while preserving EVERYTHING el
 - Making the output image square or any different aspect ratio than the input
 
 ✅ YOUR ONLY JOB:
-Replace the specified garment with the one shown in the second image. Everything else stays 100% identical.
+COMPLETELY REMOVE the target garment from the person and REPLACE it with the new garment. The old clothing MUST be gone - not hidden underneath, but REMOVED. Everything else (face, body, pose, background, other clothes) stays 100% identical.
 
-🔒 FINAL REMINDER: The output image dimensions and aspect ratio MUST exactly match the input person photo. Do not change the canvas size, do not add background areas, do not crop. Use the EXACT same width, height, and aspect ratio as the person photo.
+🔒 FINAL REMINDER:
+1. The output image dimensions and aspect ratio MUST exactly match the input person photo
+2. The old garment MUST be COMPLETELY REMOVED before adding the new one
+3. NO layering - this is a REPLACEMENT, not an overlay
 
-Generate result now - preserve everything except the garment.`;
+Generate result now - complete replacement, preserve everything else.`;
 
     console.log(`Processing job ${jobId} with Gemini API...`);
 
